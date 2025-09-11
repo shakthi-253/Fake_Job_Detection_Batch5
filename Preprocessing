@@ -1,0 +1,22 @@
+import re
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Text cleaning
+def clean_text(s):
+    s = s.lower()
+    s = re.sub(r'<[^>]+>', ' ', s)       # remove HTML tags
+    s = re.sub(r'http\S+', ' ', s)       # remove URLs
+    s = re.sub(r'[^a-z\s]', ' ', s)      # keep only letters
+    s = re.sub(r'\s+', ' ', s).strip()   # collapse spaces
+    return s
+
+# Preprocessing: tokenization, stopword removal, lemmatization
+def preprocess(s):
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
+    tokens = word_tokenize(s)
+    tokens = [t for t in tokens if t.isalpha() and t not in stop_words and len(t) > 1]
+    tokens = [lemmatizer.lemmatize(t) for t in tokens]
+    return " ".join(tokens)
