@@ -1,0 +1,85 @@
+import pandas as pd
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+import nltk
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Load dataset
+
+from google.colab import files
+filename = next(iter(files.upload()))
+df = pd.read_excel(filename)
+
+# Basic check
+
+print("Shape:", df.shape)
+print("Columns:", df.columns.tolist())
+if 'label' not in df.columns:
+    raise ValueError("No 'label' column found in dataset. Make sure target column is named 'label'.")
+
+# Clean text columns
+
+text_cols = ['title','description','requirements','company_profile','benefits','industry']
+existing_text_cols = [c for c in text_cols if c in df.columns]
+
+df[existing_text_cols] = df[existing_text_cols].astype(str).fillna('')
+def clean_text(s):
+    s = s.lower()
+    s = re.sub(r'<[^>]+>', ' ', s)      # remove HTML tags
+    s = re.sub(r'http\S+', ' ', s)     # remove URLs
+    s = re.sub(r'[^a-z\s]', ' ', s)    # keep only letters
+    s = re.sub(r'\s+', ' ', s).strip() # collapse spaces
+    return s
+
+
+df['text'] = df[existing_text_cols].agg(' ||| '.join, axis=1)
+df['cleaned'] = df['text'].apply(clean_text)
+print("\nSample cleaned text:\n", df['cleaned'].iloc[0][:300])
+
+# Preprocessing
+
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+def preprocess(s):
+    tokens = word_tokenize(s)  # Tokenization
+    tokens = [t for t in tokens if t.isalpha() and t not in stop_words and len(t) > 1]  # stopwords + short removal
+    tokens = [lemmatizer.lemmatize(t) for t in tokens]  # Lemmatization
+    return " ".join(tokens)  # RETURN string
+df['processed'] = df['cleaned'].apply(preprocess)
+print("\nSample processed text:\n", df['processed'].iloc[0][:300])
+
+# Vectorize + split
+X = TfidfVectorizer(max_features=5000).fit_transform(df['processed'])
+y = df['label']
+Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, stratify=y)
+
+# Train/Test split
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+    )
+print("\nTrain/Test sizes:", X_train.shape, X_test.shape)
+
+# Train model
+                    
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+#Test & Evaluate
+
+y_pred = model.predict(X_test)
+print("\nAccuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification report:\n", classification_report(y_test, y_pred))
+print("\nConfusion matrix:\n", confusion_matrix(y_test, y_pred))
